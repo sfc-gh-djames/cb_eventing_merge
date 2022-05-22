@@ -27,9 +27,40 @@ wait_for_container() {
 	return $success
 }
 
+# wait_for_bucket seconds bucket ip_address port
+# Check for a response from http://ip_address:port and return error code
+# if a response is not received in seconds
+wait_for_bucket() {
+	local SECONDS=${1}
+	local BUCKET=${2}
+	local IP=${3}
+	local PORT=${4}
+	local success=1 # has not (yet) succeeded
+
+	# Check if 'jq' available. If not, just do a simple wait
+	echo | jq 2>/dev/null
+	if [ $? -ne 0 ]; then
+	  sleep ${SECONDS}
+	  return 0
+  fi
+
+	while [ ${SECONDS} -gt 0 ]; do
+		SECONDS=$((SECONDS-1))
+		VB_SERVER_COUNT=$(expr $(curl -sS -X GET -u Administrator:password http://${IP}:${PORT}/pools/default/buckets/${BUCKET} | jq '.vBucketServerMap.serverList | length'))
+		if [ ${VB_SERVER_COUNT} -gt 0 ]; then
+			success=0 # connection succeeded
+			break;
+		fi
+		sleep 1
+		echo -n "."
+	done
+	echo " " # add carriage return
+	return $success
+}
+
 ## BEGIN ##
 CB_CONTAINERNAME=cb_merge
-CB_CONTAINERTAG=enterprise-7.0.3
+CB_CONTAINERTAG=enterprise-7.1.0
 CB_CLUSTERNAME="Couchbase Eventing Demo"
 CB_HOST=localhost
 
@@ -113,8 +144,6 @@ for bucket in customer eventing_merge schema1 schema2; do
 		-d flushEnabled=1 2>/dev/null
 done
 
-sleep 3
-
 # Create collections
 for collection in customers addresses postal_codes; do
 	echo "**** Creating schema1 collection: ${collection}"
@@ -122,6 +151,15 @@ for collection in customers addresses postal_codes; do
 		http://${CB_HOST}:8091/pools/default/buckets/schema1/scopes/_default/collections \
 		-d name=${collection}
 done
+
+wait=30
+echo -n "Waiting up to ${wait} seconds for buckets to warm up"
+wait_for_bucket ${wait} "schema1" ${CB_HOST} 8091
+success=$?
+if [ $success -ne 0 ]; then
+	echo "Bucket warm up failed to complete!" >&2
+	exit 99
+fi
 
 echo "**** Loading sample data into CB"
 docker exec -it ${CB_CONTAINERNAME} cbimport json --format list -c http://${CB_HOST}:8091 \
@@ -144,7 +182,7 @@ curl ${CURL_DEBUG} -X POST --output /dev/null -u Administrator:password http://$
 # Import eventing functions
 cd $LOCPATH/scripts
 echo "**** Importing eventing functions"
-sleep 3
+# sleep 3
 curl ${CURL_DEBUG} -XPOST -d @./schema1_merge.json \
 	http://Administrator:password@${CB_HOST}:8096/api/v1/functions/schema1_merge 
 curl ${CURL_DEBUG} -XPOST -d @./schema2_merge.json \

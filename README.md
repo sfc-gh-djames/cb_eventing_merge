@@ -1,6 +1,6 @@
 # **Project Overview**
 
-This project is related to the Couchbase Blog Post, *[Using the Eventing Service to Consolidate Data from Multiple Sources](http://blog.couchbase.com/)*, and contains scripts to deploy and configure a Couchbase cluster locally using a *Docker container*, including loading sample data.
+This project is related to the Couchbase Blog Post, *[Using the Eventing Service to Consolidate Data from Multiple Sources](https://www.couchbase.com/blog/eventing-data-consolidation-in-couchbase/)*, and contains scripts to deploy and configure a Couchbase cluster locally using a *Docker container*, including loading sample data.
 ### Steps
 
 1) Ensure Docker is installed and the Docker engine is running<br>
